@@ -1,0 +1,112 @@
+---
+import { codeToHtml, createHighlighter } from "shiki";
+import PowerPC from '../assets/ppc.tmLanguage.json'
+
+const { firstSrc, firstTitle, language, secondSrc, secondTitle} = Astro.props
+
+const highlighter = await createHighlighter({
+    themes: ["tokyo-night"],
+    langs: [PowerPC, "c", "c++"],
+});
+
+const codeHtml = highlighter.codeToHtml(firstSrc, {
+    theme: 'tokyo-night',
+    lang: language,
+})
+
+const psuedoHtml = highlighter.codeToHtml(secondSrc, {
+    theme: 'tokyo-night',
+    lang: 'c',
+})
+
+highlighter.dispose()
+
+const uid = crypto.randomUUID();
+---
+
+<div class="code-tab">
+    <header>
+        <button class="tabBtn" data-tab={`${uid}-${firstTitle}-div`}>{firstTitle}</button>
+        <button class="tabBtn" data-tab={`${uid}-${secondTitle}-div`}>{secondTitle}</button>
+    </header>
+
+    <div id={`${uid}-${firstTitle}-div`} class="tabcontent" data-uid={uid} set:html={codeHtml.toString()} />
+
+    <div id={`${uid}-${secondTitle}-div`} class="tabcontent" data-uid={uid} set:html={psuedoHtml.toString()} />
+</div>
+
+<style>
+    /* Style the tab */
+    header {
+        overflow: hidden;
+        border: 1px solid #ccc;
+        background-color: #f1f1f1;
+    }
+
+    /* Style the buttons that are used to open the tab content */
+    header button {
+        background-color: inherit;
+        float: left;
+        border: none;
+        outline: none;
+        cursor: pointer;
+        padding: 14px 16px;
+        transition: 0.3s;
+    }
+
+    /* Change background color of buttons on hover */
+    header button:hover {
+        background-color: #ddd;
+    }
+
+    /* Create an active/current tablink class */
+    header button.active {
+        background-color: #ccc;
+    }
+
+    /* Style the tab content */
+    .tabcontent {
+        display: none;
+        padding: 6px 12px;
+        border: 1px solid #ccc;
+        border-top: none;
+    }
+</style>
+
+<script>
+    document.addEventListener("DOMContentLoaded", () => {
+        document.querySelectorAll(".code-tab").forEach(el => {
+            el.querySelector(".tabBtn").click();
+        })
+    })
+
+    document.querySelectorAll(".tabBtn").forEach(btn => {
+        btn.addEventListener("click", (evt) => {
+            const tabGroup = btn.closest(".code-tab");
+            openCodeTab(evt, btn.dataset.tab, tabGroup);
+        })
+    })
+
+    function openCodeTab(evt, tab, tabGroup) {
+        // Declare all variables
+        var i, tabcontent, tablinks;
+
+        // Get all elements with class="tabcontent" and hide them
+        tabcontent = tabGroup.getElementsByClassName("tabcontent");
+        for (i = 0; i < tabcontent.length; i++) {
+            tabcontent[i].style.display = "none";
+        }
+
+        // Get all elements with class="tablinks" and remove the class "active"
+        tablinks = tabGroup.getElementsByClassName("tabBtn");
+        for (i = 0; i < tablinks.length; i++) {
+            tablinks[i].className = tablinks[i].className.replace(" active", "");
+        }
+
+        // Show the current tab, and add an "active" class to the button that opened the tab
+        document.getElementById(tab).style.display = "block";
+        evt.currentTarget.className += " active";
+    }
+
+    document.addEventListener("unl")
+</script>

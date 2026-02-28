@@ -1,0 +1,77 @@
+---
+import { Image } from 'astro:assets'
+const { firstSrc, firstAlt, secondSrc, secondAlt, caption } = Astro.props
+---
+
+<script>
+    import 'img-comparison-slider'
+</script>
+
+<figure>
+    <img-comparison-slider>
+        <Image style="width:100%; height:100%; object-fit: contain;" slot="first" src={firstSrc} alt={firstAlt} />
+        <Image style="width:100%; height:100%; object-fit: contain; display: block;" slot="second" src={secondSrc} alt={secondAlt} />
+    </img-comparison-slider>
+    <figcaption><sub>{caption}</sub></figcaption>
+</figure>
+
+<script>
+    // From Claude ai - I don't like that it is messing with the shadowRoot, but so far the only thing that has worked.
+    document.querySelectorAll('img-comparison-slider').forEach(slider => {
+        const figure = slider.closest('figure')
+
+        figure.addEventListener('dblclick', () => {
+            if (figure.requestFullscreen) {
+                figure.requestFullscreen()
+            }
+        })
+
+        document.addEventListener('fullscreenchange', () => {
+            if (document.fullscreenElement === figure) {
+                const style = document.createElement('style')
+                style.textContent = '.second { height: 100%; }'
+                slider.shadowRoot.appendChild(style)
+            }
+        })
+    })
+</script>
+
+<style>
+img-comparison-slider {
+    outline: none;
+}
+
+figure {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+}
+
+figure:has(img-comparison-slider):fullscreen {
+    width: 100vw;
+    height: 100vh;
+    background: black;
+    color: white;
+}
+
+
+figure:fullscreen img-comparison-slider {
+    width: 100vw;
+    height: 100vh;
+    flex: 1;
+    min-height: 0;
+}
+
+figure:fullscreen img-comparison-slider.rendered [slot='second'] {
+    display: flex;
+    height: 100%;
+    width: 100%;
+    object-fit: contain;
+    flex: 1;
+}
+
+figcaption {
+    text-align: center;
+}
+</style>

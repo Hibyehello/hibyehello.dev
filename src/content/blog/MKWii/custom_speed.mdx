@@ -1,0 +1,288 @@
+---
+title: "Prettier Speedometer"
+description: 'A customized speedometer for Mario Kart Wii'
+pubDate: 'Feb 23 2026'
+heroImage: '../../../assets/Blog-Speedometer.png'
+---
+export const ppcCode = `lis r3, 0x1000`
+
+import { Code } from 'astro:components'
+import BlogImage from '../../../components/BlogImage.astro'
+import ImageCompare from '../../../components/ImageCompare.astro'
+import CodeWidget from '../../../components/CodeWidget.astro'
+import oldSpeedometer from '../../../assets/MKWii/Old_Speedometer.png'
+import prettySpeedometer from '../../../assets/MKWii/Pretty_Speedometer.png'
+import customColorSpeed from '../../../assets/MKWii/Bad_Font.png'
+import fontFirstTry from '../../../assets/MKWii/Font_First_Try.png'
+import fontWorking from '../../../assets/MKWii/Font_Working.png'
+import goodFont from '../../../assets/MKWii/Good_Font.png'
+import stackedSpeedometer from '../../../assets/MKWii/Stacked_Speedometers.png'
+import brokenVariant from '../../../assets/MKWii/Broken_Variant_4p.png'
+import beautifulSpeedomter from '../../../assets/MKWii/Beautful_Speedometer.png'
+
+<h4 style="text-align: center">My Prettier Speedometer</h4>
+
+What is something that every racing seems to have? A speedometer. The Mario Kart franchise is not like every other
+racing game. There are only three Mario Kart games that featured a built-in speedometer. 
+<sup><a href="https://mariokart.fandom.com/wiki/Speedometer" target="_blank">[1]</a></sup> These games are _Mario Kart 64_, _Mario Kart:
+Super Circuit_, and _Mario Kart: Double Dash!!_. Nintendo decided that for Mario Kart Wii and later that the speedometer 
+was useless, but the community disagreed.
+
+##### A Quick History
+
+A year after the release of Mario Kart Wii, a YouTube video by mdmwii appeared showcasing a speedometer that replaced the 
+Milliseconds portion of the on-screen timer. 
+<sup><a href="https://www.youtube.com/watch?v=Fj8Xs9C5LME" target="_blank">[2]</a></sup>
+Four years after the release of mdmwii's speedometer, a new speedometer was released by MrBean35000vr. This speedometer
+was signifacant because it now added its own new UI element to the screen. Over the years many other graphical 
+speedometers have been created. All of these speedometers have their problems, many not working with the dophin 
+emulator, or not have a similar look to the original game. Some speedometers also were not standalone, so users would
+have to have much more than just the speedometer. This changed in 2021 when Stebler created Pretty Speedometer, and
+subsequently Pretty Speedometer two years later. 
+<sup><a href="https://mariokartwii.com/showthread.php?tid=1730" target="_blank">[3]</a></sup>
+
+##### A New Era
+
+Pretty speedometer helped fix many, if not all, of these problems. It adds supports displaying for up to 4 players, 
+it also looks like the native game, it supports 16:9 and 4:3 aspect ratios, and it works without harming the image
+quality when using enhancements in the Dolphin Emulator. A useful part of this new speedometer is that it makes it
+trivial to adapt the code to display any other values. This may make you wonder what this code is missing. I myself
+didn't know the answer to this until I was looking on [mkwii.com](https://mkwii.com) under the Pretty Speedometer
+subforum, and noticed a question asking if there was a way to specify custom colors per player. This got me thinking and
+I went on to learn more about Mario Kart Wii's UI than I ever thought I would.
+
+<ImageCompare
+  firstSrc={oldSpeedometer}
+  firstAlt="Old Speedometer"
+  secondSrc={prettySpeedometer}
+  secondAlt="Pretty Speedometer"
+  caption="Notice the quality difference between the two images that used the same enhancements"
+/>
+
+##### What I Had to Learn
+
+This bit will get quite a bit more technical than the previous parts. My first steps to getting custom colors to work
+was understanding how they were set in the first place. My initial search of the code for Pretty Speedometer didn't help
+me much. I did find a section marked with a comment that said
+> change the color depending on the local player id and the team
+
+and found this instruction
+
+> .short 0x001a, 0x0800, 0x0001, 0x0030 # color
+
+This looked very promising, but I did not understand what was occurring. There were no reference to rgb values, or any
+semblance of colors. It took quite a while before I gather enough information to learn that what was being used was 
+called a 0x1A Escape Code which are used to modify UI messages.
+<sup><a href="https://wiki.tockdom.com/wiki/BMG_(File_Format)/0x1A_Escape_Sequences" target="_blank">[4]</a></sup>
+This value of 0x1A 0x0800 0x0001 0x0030 is the escape 
+code to make the messages become the yellow that we are all very familiar with in the UI. This helped me recognize what
+the code below that comment was doing as well.
+
+```ppc
+addi r3, r31, 0x30
+lis r5, RaceConfig_s_instance@ha
+lwz r5, RaceConfig_s_instance@l (r5)
+mulli r6, r31, 0xf0
+add r5, r5, r6
+lwz r5, 0xf4 (r5)
+cmpwi r5, 0x2
+beq no_team
+addi r3, r5, 0x20
+no_team:
+sth r3, -0x2 (r4)
+```
+
+The first instruction, `addi`, adds 0x30 by the player number [0-3] which was retrieved earlier in the code. Then lines 
+two through 8 check if the player is on a team. If the player is on a team then the escape code's last value gets set to
+0x20 (red) or 0x21 (blue). The very last line overwrites the last value in the default escape code.
+
+##### Getting Custom Colors Working
+
+My next adventure was trying to use custom RGB values instead of these presets that the game included for extra 
+flexibility. This led me to launch Ghidra , a reverse engineering tool developed by the National Security Agency (NSA).
+<sup><a href="https://ghidralite.com/" target="_blank">[5]</a></sup> Using a shared project there are many documented
+functions that I was able to search through to determine how the escape codes work, or at least enough to add my custom 
+colors. Through my digging I found a function that was named as `GlyphRenderer_setupColors`. This function contains a
+switch statement, or a piece of code that take an input and depending on the input runs different code. By examining 
+this switch statement I learned that there are many unused escape codes that I could use. I also learned that the 
+original game used rgb values so that meant that I could achieve my goal of using rgb values to define the colors. 
+With this knowledge in hand I chose to use escape codes 0x22 through 0x25. By using the feature of switch statements to 
+have multiple values run the same code, I was able to add an if statement to check if the requested escape code was 
+greater than or equal to 0x22 or less than or equal to 0x25. This now being in place and setup in the same way that 
+0x30-0x33 is for the original colors, it made converting the pretty speedometer's code extremely trivial. All that was 
+needed was to change `addi r3, r31, 0x30` to `addi r3, r31, 0x22`.
+
+<BlogImage Src={customColorSpeed} Alt="Custom Colored Pretty Speedometer with a label" Caption="Pretty Speedometer
+                                                                                 with custom colors and a nice label" />
+
+##### Something up with the text
+The astute among you may notice something off about my speedometer. Something that annoyed me, but I didn't think people
+would care too much. Turns out that everyone that saw this speedometer was also annoyed. The `KPH` text doesn't look
+anything like the `LAP` or `TIME` text even though we are using fonts from Mario Kart. Turns out that `LAP` and `TIME`
+are images that are included in the game files rather than being a string that uses a font. I initially thought that the
+font still at least existed in the game due to video on YouTube having matching text. Turns out that they added that in
+editing, so I'm back to square one.
+
+My next idea was to replace the font that the speedometer was using by modifying the game files. So after some effort
+and help from a friend in the modding community I achieved this slightly off attempt.
+
+<BlogImage Src={fontFirstTry} Alt="My first attempt a font" Caption="Something is not quite right" />
+
+I had many more attempts of trying to line up the fonts so that they wouldn't get cut off, and I adjusted the color. I
+made the mistake of doing it all by hand by editing the image atlas for the font. My friend steered me straight and I
+got a proper tool.
+<sup><a href="https://github.com/RoadrunnerWMC/BRFNTify-Next" target="_blank">[4]</a></sup>
+With this gained knowledge and tooling, I was able to get a font that looked nice
+
+<BlogImage Src={fontWorking} Alt="The working font in game" Caption="That looks much better" />
+
+Only one more problem to deal with. I replaced a font that gets by other text in the game, which means that the UI looks
+a little off. Unfortunately I didn't save a photo of this messed up UI, so you'll just have to believe me that it was
+not the right method for custom fonts. After some thinking, I realized that I could just make use of different section
+of Unicode rather than the normal letters. After some research on Unicode, I settled on making use of the full width
+Latin letters section. This had zero support in the original font file, which is perfect. I edited the font file to have
+the original letters in their normal location, and I added a mappings for my custom letters.
+
+Once I had the font modified, the only task left to do was to make the speedometer code convert the normal Unicode
+values to the full width Latin Letters values. Luckily for me the speedometer was already doing some conversions. These
+conversions are used to make the numbers, dots, and dashes with what the timer uses, which are all included in the font
+file I modified. All I had to do was add another check for uppercase letters, since I have no lowercase font support.
+
+Here is what I ended up writing.
+
+export const letterCode =
+`cmplwi r3, 0x41
+blt not_an_upper
+cmplwi r3, 0x5A
+bgt not_an_upper
+addis r3, r3, 1
+subi r3, r3, 0x120`
+
+export const letterCodePS =
+`if(letter >= 'A' && letter <= 'Z')
+    letter += 0xFEE0;`
+
+<CodeWidget firstSrc={letterCode} firstTitle="PowerPC" language="PowerPC" secondSrc={letterCodePS} secondTitle="Psuedo-Code" />
+
+The first 4 lines check if the Unicode value corresponds with an uppercase letter. The last two lines convert the
+normal uppercase letter to the full width Latin letter. With this code complete I was finally able to have custom fonts
+without ruining any other UI elements.
+
+<BlogImage Src={goodFont} Alt="Speedometer with custom color and pretty label" Caption="Feels vanilla now" />
+
+##### One Final Feature
+
+We're at a state that makes the speedometer much more flexible that it used to be. There is still one aspect that is
+holding it back from being fully flexible. The way that the speedometer was designed was built to be used without
+modifying game files, which means that it uses in-game assets. It specifically piggybacks off of the coin counter that
+is used in Coin Runner Battles with a few dynamic patches to make it look right. While it is very convenient to not
+require new assets. I was not aiming for a simple code that a user can just run, rather I was aiming for a speedometer
+that can be easily added to modpacks. This final feature is separating the speedometer into it's a standalone UI element.
+
+A benefit of the speedometer becoming fully independent is that it could then be edited without changing the aesthetic of
+the coin element. The quest began as soon as I needed to figure out how to load my own layout and layout control, or
+BRLYT <sup><a href="https://wiki.tockdom.com/wiki/BRLYT_(File_Format)" target="_blank">[5]</a></sup> and BRCTR
+<sup><a href="https://wiki.tockdom.com/wiki/BRCTR_(File_Format)" target="_blank">[6]</a></sup> respectively. In the
+speedometer case up to this point it loaded points.brctr and coin.brlyt. The only reason that the speedometer didn't
+look exactly the same as the coin counter was purely due to extra instructions to change the brctr dynamically.
+
+My next step after figuring out what got loaded was to find the game code responsible for loading the assets. Time to
+jump back into the Ghidra project.
+
+After some searching I found
+
+export const vanillaBrctr =
+`addi r3,r1,0x8
+addi r4,localPlayerId,0x45    = "game_image"
+li r7,0x0
+addi r5, localPlayerId, 0x50       = "point"
+bl ControlLoader_load`
+
+export const vanillaBrctrPS = `ControlLoader_load(stack_0x8, "game_image", "point")`
+
+<CodeWidget firstSrc={vanillaBrctr} firstTitle="PowerPC" language="PowerPC" secondSrc={vanillaBrctrPS} secondTitle="Psuedo-Code" />
+
+Line 4 of this snippet is the magic instruction that I needed to modify. This line loads `point` in the Control Loader,
+which means that I just needed to add a basic check to see if it's our speedometer or not. With this knowledge in hand I
+was able to produce the following code to inject in place of line 4
+
+export const customBrctr =
+`    bl jump_3
+    .string "speedometer"
+jump_3:
+    mflr r9
+    andi. r0, r21, 0x1
+    bne original
+    mr r5, r9
+    b end_3
+original:
+    // Load Original Brctr for non
+    // custom CtrlRaceBattlePoints
+    addi r5, r5, 0x50
+end_3:`
+
+export const customBrctrPS =
+`name = "speedometer"
+if(element.custom)
+    brctrName = name
+else
+    brctrName = "point"
+`
+
+<CodeWidget firstSrc={customBrctr} firstTitle="PowerPC" language="PowerPC" secondSrc={customBrctrPS} secondTitle="Psuedo-Code" />
+
+This code isn't super complicated to follow if you know PowerPC assembly. For those that don't understand, don't worry
+I'll explain it for you. The first 4 lines are a cool technique of embedding data into the code which allows me to more
+easily store the name of the BRCTR that I want to load. The next 2 lines check a flag in the Control code that tells us
+if it's the speedometer or not. The next 2 lines load the name of the control that I want to load for the speedometer,
+which in this case is 'speedometer'. Line 12 is used to load the original name if it isn't the speedometer.
+
+If you thought that this was all to make custom BRCTRs work, then you are sadly mistaken. Many elements, like the coin
+counter, have sub-variants to define locations for one player, two players, and four players (3 player is included in
+four player). The speedometer is no exception, else all speedometers stack on top of each other as shown below.
+
+<BlogImage Src={stackedSpeedometer} Alt="Speedometers all stacked on top of each other" Caption="Those are in the wrong spots" />
+
+That's definitely not too useful to only fully see one speedometer, so I had some work to do. Luckily the work was
+basically the same as the BRCTR. All that was needed was patching the name of the variants, and I would be home free.
+Unfortunately my first attempt at writing the code was unsuccessful. I had somehow made it that only the 4 player
+position was being used, so the speedometer looked a little out of place in singleplayer modes.
+
+<BlogImage Src={brokenVariant} Alt="Misplaced speedometer" Caption="Not sure that I like this position" />
+
+Luckily I was able to figure out what the problem was. The location of where I injected my code and basically writing an
+if statement caused me to overwrite the value of a previous logic check, so it would evaluate incorrectly everytime. The
+fix being to check write the check again at the end of my injected code.
+
+export const variantCode = `    bl inject
+    .string "CtrlSpeedometer_%d_%d"
+    .align 4
+inject:
+    andi. r0, r21, 0x1
+    bne normal_variant
+    mflr r5
+    b end_variant
+    normal_variant:
+    addi r5, r28, 0x41
+end_variant:
+    // Clobbered the CR0 so it needs to be
+    // compared again
+    cmplwi r19, 0x3
+`
+
+export const variantCodePS = `name = "CtrlSpeedometer_%d_$d"
+if(element.custom)
+    variant = name
+else
+    variant = CtrlRacePoint_%d_%d;
+// Clobbered the CR0 so it needs to be compared
+// again
+if (localPlayerCount != 3)
+`
+
+<CodeWidget firstSrc={variantCode} firstTitle="PowerPC" language="PowerPC" secondSrc={variantCodePS} secondTitle="Psuedo-Code" />
+
+Now with this code complete, the speedometer customizations are complete as well. Unless someone comes knocking asking
+for some new feature this code is complete. Enjoy a photo of the complete code.
+
+<BlogImage Src={beautifulSpeedomter} Alt="The completed speedometer" Caption="This speedometer has never looked better" />

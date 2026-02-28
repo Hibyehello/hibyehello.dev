@@ -1,0 +1,37 @@
+---
+import { Image } from 'astro:assets'
+const { Src, Alt, Caption } = Astro.props
+---
+
+
+<figure>
+    <Image src={Src} alt={Alt} />
+    <figcaption><sub>{Caption}</sub></figcaption>
+</figure>
+
+<script>
+    document.querySelectorAll("figure").forEach(function(el) {
+        el.addEventListener("dblclick", function() {
+            if(el.requestFullscreen)
+                el.requestFullscreen();
+        })
+    })
+</script>
+
+<style>
+figure {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    color: black;
+}
+
+figure:fullscreen {
+    color: white;
+}
+
+figcaption {
+    text-align: center;
+}
+</style>
